@@ -36,6 +36,8 @@ FACTER=$(which facter 2> /dev/null)
 TOINSTALL=""
 TMPDIR="/tmp/sat6_check"
 release=$(awk '{print $7}' /etc/redhat-release | cut -c1)
+PROXY_URL=$(egrep '\bproxy_url:' /etc/katello-installer/answers.katello-installer.yaml|cut -d\" -f 2)
+PROXY_PORT=$(egrep '\bproxy_port:' /etc/katello-installer/answers.katello-installer.yaml|cut -d\" -f 2)
 
 # Check specific constants
 FIREWALLD_XML="/usr/lib/firewalld/services/RH-Satellite-6.xml"
@@ -310,8 +312,14 @@ function checkNetworkConnection {
     "
     # Connection to cdn.redhat.com
     echo " + Checking connection to cdn.redhat.com"
-    ms=$(ping -c5 cdn.redhat.com | awk -F"/" '/^rtt/ {print $5}')
-    echo " -  Complete.  Average was $ms ms"
+    # If PROXY_URL is defined add the proxy option to curl using the PROXY_URL
+    # and PROXY_PORT taken from the katello answer file
+    if curl ${PROXY_URL:+--proxy $PROXY_URL:${PROXY_PORT:=80}} -S cdn.redhat.com
+      then
+        printOK "Connection to CDN succeeded."
+      else
+        printError "Connection to CDN failed!"
+    fi
 }
 
 function checkSELinux {
